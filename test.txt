@@ -1,0 +1,276 @@
+If you want the easiest beginner path, do this first:
+
+React → EC2 (via Nginx)
+Node/Express → EC2 (PM2)
+MongoDB → Atlas
+
+Everything on one EC2 instance.
+
+Step 1: Prepare Your Project
+
+Before deployment, make sure:
+
+Backend
+Environment variables are in .env
+
+Example:
+
+PORT=5000
+MONGO_URI=your_mongodb_url
+JWT_SECRET=secret
+RAZORPAY_KEY=xxxx
+
+Never hardcode secrets.
+
+Frontend
+
+Your API URL should be configurable.
+
+Instead of:
+
+axios.get("http://localhost:5000/api")
+
+Use:
+
+axios.get(import.meta.env.VITE_API_URL)
+
+.env.production
+
+VITE_API_URL=https://yourdomain.com/api
+
+or
+
+VITE_API_URL=http://EC2_PUBLIC_IP:5000/api
+Step 2: Push Code to GitHub
+
+Push both frontend and backend.
+
+Example:
+
+frontend repo
+backend repo
+
+or monorepo.
+
+This makes deployment easier.
+
+Step 3: Launch EC2 Instance
+
+Go to:
+
+AWS Console
+
+Open:
+
+EC2 Dashboard
+
+Create instance
+
+Choose:
+
+OS: Ubuntu 24.04 LTS
+Instance type:
+Free tier → t2.micro
+Better → t3.micro
+
+Create key pair (.pem file).
+
+Security Group
+
+Allow:
+
+Type	Port
+SSH	22
+HTTP	80
+HTTPS	443
+Custom TCP	5000
+
+(5000 only if backend exposed directly)
+
+Launch instance.
+
+Step 4: Connect to EC2
+
+In terminal:
+
+chmod 400 key.pem
+
+Connect:
+
+ssh -i key.pem ubuntu@YOUR_PUBLIC_IP
+Step 5: Install Required Packages
+
+Update server:
+
+sudo apt update
+sudo apt upgrade -y
+
+Install Node.js:
+
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+
+Check:
+
+node -v
+npm -v
+
+Install Git:
+
+sudo apt install git -y
+
+Install Nginx:
+
+sudo apt install nginx -y
+Step 6: Clone Project
+
+Example:
+
+git clone your_repo_url
+
+Go inside:
+
+cd backend
+
+Install packages:
+
+npm install
+
+Create .env
+
+nano .env
+
+Paste env values.
+
+Run:
+
+npm start
+
+Test:
+
+http://EC2_PUBLIC_IP:5000
+Step 7: Use PM2 (Important)
+
+Without PM2, server stops after terminal closes.
+
+Install:
+
+sudo npm install -g pm2
+
+Start backend:
+
+pm2 start server.js
+
+or
+
+pm2 start npm -- start
+
+Check:
+
+pm2 list
+
+Save process:
+
+pm2 save
+
+Auto restart on reboot:
+
+pm2 startup
+
+Run the generated command.
+
+Step 8: Deploy React Frontend
+
+Build frontend locally:
+
+npm run build
+
+You’ll get:
+
+dist/
+
+Upload to EC2.
+
+Option 1 (easy):
+
+scp -i key.pem -r dist ubuntu@IP:/home/ubuntu/
+
+Move files:
+
+sudo rm -rf /var/www/html/*
+sudo cp -r dist/* /var/www/html/
+
+Test:
+
+http://EC2_PUBLIC_IP
+
+React app should open.
+
+Step 9: Configure Nginx Reverse Proxy
+
+Edit config:
+
+sudo nano /etc/nginx/sites-available/default
+
+Example:
+
+server {
+    listen 80;
+    server_name _;
+
+    root /var/www/html;
+    index index.html;
+
+    location / {
+        try_files $uri /index.html;
+    }
+
+    location /api {
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+Restart:
+
+sudo nginx -t
+sudo systemctl restart nginx
+
+Now:
+
+Frontend → EC2 IP
+Backend → /api
+
+Example:
+
+http://IP/api/products
+Step 10: Domain Name (Optional)
+
+Buy domain from:
+
+Namecheap
+GoDaddy
+
+Point domain to EC2 public IP using A record.
+
+Step 11: Add HTTPS (Very Important)
+
+Install:
+
+sudo apt install certbot python3-certbot-nginx -y
+
+Run:
+
+sudo certbot --nginx
+
+Choose domain.
+
+SSL automatically configured.
+
+Now:
+
+https://yourdomain.com
